@@ -1,6 +1,11 @@
 -- Spellbook skill line tab UI (visually identical to original) with collapsible headers + search dimming + custom search box styling and placeholder
 local ADDON_NAME, wt = ...
 
+-- Expose the addon table globally so host addons (e.g. DragonUI_NewEra) can detect us and call
+-- wt.AttachToHost / wt.ShowPanel / wt.HidePanel without a hard #include dependency. Safe: `wt` is
+-- only ever this addon's own namespace table, nothing else is exposed.
+_G.WhatsTraining = wt
+
 local BOOKTYPE_SPELL = BOOKTYPE_SPELL
 local MAX_ROWS = 22
 local ROW_HEIGHT = 14
@@ -580,6 +585,10 @@ function wt.CreateFrame()
 
   -- Compute and apply visibility for our frame and the checkbox based on SpellBook state
   local function WT_ApplySpellbookVisibility()
+    -- Externally hosted (e.g. DragonUI_NewEra): the host frame owns Show/Hide + geometry
+    -- entirely. The native SpellBookFrame this logic is built around may be permanently
+    -- suppressed by the host, so touching it here would fight the host for control.
+    if wt._externalHost then return end
     local skillLineTab = _G["SpellBookSkillLineTab" .. SKILL_LINE_TAB]
     if skillLineTab then
       skillLineTab:SetNormalTexture(TAB_TEXTURE_PATH)
@@ -628,11 +637,57 @@ function wt.CreateFrame()
   end
 
   -- Apply initial visibility state
-  if type(SpellBookFrame_Update) == "function" then
-    SpellBookFrame_Update()
-  else
-    WT_ApplySpellbookVisibility()
+  if not wt._externalHost then
+    if type(SpellBookFrame_Update) == "function" then
+      SpellBookFrame_Update()
+    else
+      WT_ApplySpellbookVisibility()
+    end
   end
+end
+
+-- ============================================================================
+-- EXTERNAL HOST API — lets another addon (e.g. DragonUI_NewEra) embed this panel in its
+-- own window instead of the native SpellBookFrame. Once attached, the native
+-- SpellBookSkillLineTab / SpellBookFrame_Update machinery above no-ops (see the
+-- wt._externalHost guards) and the host is fully responsible for Show/Hide + sizing.
+-- ============================================================================
+function wt.AttachToHost(hostFrame)
+  if not hostFrame then return end
+  wt._externalHost = hostFrame
+
+  if type(wt.CreateFrame) == "function" then wt.CreateFrame() end
+  local mf = wt.MainFrame
+  if mf then
+    mf:SetParent(hostFrame)
+    mf:ClearAllPoints()
+    mf:SetAllPoints(hostFrame)
+    mf:SetFrameStrata(hostFrame:GetFrameStrata() or "MEDIUM")
+    mf:SetFrameLevel((hostFrame.GetFrameLevel and hostFrame:GetFrameLevel() or 1) + 1)
+    mf:Hide()   -- host decides when to show it (wt.ShowPanel)
+  end
+
+  -- Hide/neuter the native tab so it doesn't sit on the (now-suppressed) Blizzard book.
+  local tabIndex = (MAX_SKILLLINE_TABS and (MAX_SKILLLINE_TABS - 1)) or 4
+  local tab = _G["SpellBookSkillLineTab" .. tabIndex]
+  if tab then tab:Hide() end
+end
+
+local wt_hasShownOnce = false
+function wt.ShowPanel()
+  if type(wt.CreateFrame) == "function" then wt.CreateFrame() end
+  local mf = wt.MainFrame
+  if not mf then return end
+  if not wt_hasShownOnce then
+    if type(wt.RebuildData) == "function" then wt.RebuildData() end
+    wt_hasShownOnce = true
+  end
+  mf:Show()
+  if type(wt.Update) == "function" then wt.Update(mf, true) end
+end
+
+function wt.HidePanel()
+  if wt.MainFrame then wt.MainFrame:Hide() end
 end
 
 -- ===== Tab icon (What's Training? spellbook tab) =====
@@ -652,6 +707,7 @@ local function SetZoomedTexCoord(tex, left, right, top, bottom, zoom)
 end
 
 local function ApplyWTTabIconInternal()
+  if wt._externalHost then return end   -- host owns its own tab art
   local tabIndex = (MAX_SKILLLINE_TABS and (MAX_SKILLLINE_TABS - 1)) or 4
   local tab = _G["SpellBookSkillLineTab" .. tabIndex]
   if not tab then return end
@@ -708,4 +764,3 @@ if type(hooksecurefunc) == "function" and type(SpellBookFrame_Update) == "functi
   end)
 end
 -- ===== End: Tab icon =====
-
