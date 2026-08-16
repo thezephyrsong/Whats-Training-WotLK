@@ -1,8 +1,8 @@
 ## Interface: 30300
-## Title: What's Training? Epoch
+## Title: What's Training? WotLK
 ## Notes: Server-agnostic What's Training? (identical UI/UX) that learns only from trainers
 ## Author: ZythDr
-## Version: 1.0.6
+## Version: 1.0.7
 ## SavedVariables: WT_EpochAccountDB
 ## SavedVariablesPerCharacter: WT_EpochCharDB
 
