@@ -1,5 +1,4 @@
-# What's Training? Epoch (Server-agnostic)
-### Although the name suggests this fork is for Epoch specifically, it was made to be server-agnostic and *should* work on any 3.3.5 server.  
+# What's Training? (Server-agnostic)
 
 A server‑agnostic rework of “What’s Training?” made to be used on Project Epoch primarily. But really it's for WotLK servers.  
 It keeps the original What's Training? UI and scans for spells/abilities upon class trainer visit instead of coming pre-bundled with a static database.
